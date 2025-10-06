@@ -1,4 +1,3 @@
-// server.js (Complete and Corrected File)
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
@@ -26,9 +25,7 @@ const SUSPICIOUS_THRESHOLD = 50;
 
 const cache = new NodeCache({ stdTTL: CACHE_TTL_SECONDS, checkperiod: 120 });
 
-// ====================================================================
 // SECTION 1: ORIGINAL UTILITY FUNCTIONS (Needed for Link Scanning)
-// ====================================================================
 
 function normalizeScore(n) {
     if (n == null || Number.isNaN(n)) return null;
@@ -138,7 +135,7 @@ async function getRedirectInfo(url) {
     }
 }
 
-// THIS IS THE MISSING FUNCTION
+
 async function aggregateSignals({ url, anchorText, senderDomain }) {
     const cacheKey = `scan::${url}::${anchorText || ''}::${senderDomain || ''}`;
     const cached = cache.get(cacheKey);
@@ -178,9 +175,8 @@ async function aggregateSignals({ url, anchorText, senderDomain }) {
 }
 
 
-// ====================================================================
-// SECTION 2: NEW EMAIL ANALYSIS FUNCTIONS (With Robustness Fixes)
-// ====================================================================
+
+// SECTION 2: NEW EMAIL ANALYSIS FUNCTIONS 
 
 function analyzeHeaders(headersText) {
     let score = 0;
@@ -218,10 +214,7 @@ function analyzeBody(bodyText) {
     return { score, keywordsFound };
 }
 
-
-// ====================================================================
 // SECTION 3: API ENDPOINTS
-// ====================================================================
 
 app.post('/scan-email', async (req, res) => {
     try {

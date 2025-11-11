@@ -47,7 +47,7 @@ function hasIPInHostname(urlObj) {
     return /^(\d{1,3}\.){3}\d{1,3}$/.test(host);
 }
 
-const suspiciousTLDs = new Set(['zip', 'review', 'country', 'kim', 'gq', 'work', 'top', 'men', 'party', '.co', 'xyz', 'co', 'tk', 'ml', 'cf', 'cn', 'cam', 'support', 'guide', 'live', 'click', 'biz']);
+const suspiciousTLDs = new Set(['zip', 'review', 'country', 'kim', 'gq', 'work', 'top', 'men', 'party', 'xyz', 'co', 'tk', 'ml', 'cf', 'cn', 'cam', 'support', 'guide', 'live', 'click', 'biz']);
 
 function heuristicsScore({ url, anchorText, redirectCount, finalUrl }) {
     try {

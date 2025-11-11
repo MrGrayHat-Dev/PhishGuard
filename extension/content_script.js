@@ -1,17 +1,15 @@
-// content_script.js (updated)
 
-/**
- * Shows a warning banner at the top of the page.
- * @param {string} verdict - 'malicious', 'suspicious', or 'safe'.
- * @param {number} score - The numeric score from the backend.
- */
+/* Shows a warning banner at the top of the page.
+* @param {string} verdict - 'malicious', 'suspicious', or 'safe'.
+* @param {number} score - The numeric score from the backend.
+*/
 function showWarning(verdict, score) {
     // Remove any existing banner first
     const existingBanner = document.getElementById('phish-guard-banner');
     if (existingBanner) existingBanner.remove();
 
-    if (!verdict || verdict === 'safe') {
-        console.log('Phish Guard: Email seems safe.');
+    if (!verdict) {
+        console.log('Phish Guard: No verdict received.');
         return;
     }
 
@@ -21,6 +19,10 @@ function showWarning(verdict, score) {
     let bannerColor = '';
 
     switch (verdict) {
+        case 'safe':
+            bannerText = `✅ SAFE: This email appears to be safe. Score: ${score}/100`;
+            bannerColor = '#28a745';
+            break;
         case 'malicious':
             bannerText = `🚨 DANGER: This email is likely a phishing attempt. Score: ${score}/100`;
             bannerColor = '#ff4d4d';
@@ -32,23 +34,29 @@ function showWarning(verdict, score) {
     }
 
     banner.textContent = bannerText;
+    // This is the NEW pop-up style
     Object.assign(banner.style, {
         position: 'fixed',
-        top: '0',
-        left: '0',
-        width: '100%',
-        padding: '12px',
+        top: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '350px',
+        padding: '16px',
         backgroundColor: bannerColor,
         color: 'black',
         textAlign: 'center',
         zIndex: '99999',
         fontSize: '16px',
         fontWeight: 'bold',
-        borderBottom: '2px solid black'
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
     });
 
     document.body.appendChild(banner);
 
+    setTimeout(() => {
+        banner.remove();
+    }, 3000);
     // Allow user to dismiss the banner
     banner.onclick = () => banner.remove();
 }
@@ -58,9 +66,9 @@ function showWarning(verdict, score) {
  * This function uses heuristics and may need adjustment for different webmail clients.
  */
 function scanVisibleEmail() {
-    // Heuristic selectors for Gmail. These WILL need to be adapted for Outlook etc.
-    const emailBodyNode = document.querySelector('.adn.ads'); // A common Gmail body container
-    const headersNode = document.querySelector('.ajv'); // "Show details" container in Gmail
+    const emailBodyNode = document.querySelector('.adn.ads');
+    const headersNode = document.querySelector("pre");
+
 
     if (!emailBodyNode || emailBodyNode.dataset.phishGuardScanned) {
         return; // Either not an email view or already scanned
@@ -91,13 +99,12 @@ function scanVisibleEmail() {
 }
 
 // Use a MutationObserver to detect when a new email is loaded in the DOM.
-// This is more reliable than timers for single-page apps like Gmail.
 const observer = new MutationObserver((mutations) => {
     // A simple check to see if the DOM has changed significantly
     for (const mutation of mutations) {
         if (mutation.addedNodes.length > 0) {
             // Use a small delay to ensure the email content is fully rendered
-            setTimeout(scanVisibleEmail, 500);
+            setTimeout(scanVisibleEmail, 200);
             return;
         }
     }

@@ -20,8 +20,8 @@ const PHISHTANK_API_KEY = process.env.PHISHTANK_API_KEY || null;
 const STALKPHISH_API_KEY = process.env.STALKPHISH_API_KEY || null;
 
 const CACHE_TTL_SECONDS = Number(process.env.CACHE_TTL) || 60 * 60; // 1h
-const MALICIOUS_THRESHOLD = 80;
-const SUSPICIOUS_THRESHOLD = 50;
+const MALICIOUS_THRESHOLD = 60;
+const SUSPICIOUS_THRESHOLD = 40;
 
 const cache = new NodeCache({ stdTTL: CACHE_TTL_SECONDS, checkperiod: 120 });
 
@@ -39,7 +39,7 @@ function isPunycode(hostname) {
 const WEIGHTS = {
     ipqs: 0.5,
     stalkphish: 0.25,
-    heuristics: 15
+    heuristics: 35
 };
 
 function hasIPInHostname(urlObj) {
@@ -47,7 +47,7 @@ function hasIPInHostname(urlObj) {
     return /^(\d{1,3}\.){3}\d{1,3}$/.test(host);
 }
 
-const suspiciousTLDs = new Set(['zip', 'review', 'country', 'kim', 'gq', 'work', 'top', 'men', 'party']);
+const suspiciousTLDs = new Set(['zip', 'review', 'country', 'kim', 'gq', 'work', 'top', 'men', 'party', '.co', 'xyz', 'co', 'tk', 'ml', 'cf', 'cn', 'cam', 'support', 'guide', 'live', 'click', 'biz']);
 
 function heuristicsScore({ url, anchorText, redirectCount, finalUrl }) {
     try {
@@ -59,10 +59,11 @@ function heuristicsScore({ url, anchorText, redirectCount, finalUrl }) {
                 try {
                     const aHost = m[0].startsWith('http') ? new URL(m[0]).hostname : m[0].replace(/^www\./i, '');
                     if (aHost && aHost !== urlObj.hostname) score += 12;
-                } catch (e) {}
+                } catch (e) { }
             }
         }
         if (isPunycode(urlObj.hostname)) score += 10;
+        if (urlObj.protocol === 'http:') score += 15;
         if (hasIPInHostname(urlObj)) score += 12;
         const tld = urlObj.hostname.split('.').pop()?.toLowerCase();
         if (tld && suspiciousTLDs.has(tld)) score += 8;
@@ -71,7 +72,7 @@ function heuristicsScore({ url, anchorText, redirectCount, finalUrl }) {
             try {
                 const f = new URL(finalUrl);
                 if (f.hostname !== urlObj.hostname) score += 6;
-            } catch (e) {}
+            } catch (e) { }
         }
         return score;
     } catch (e) {
@@ -84,12 +85,12 @@ async function checkDomainAuth(domain) {
     try {
         const txts = await dns.resolveTxt(domain);
         result.spf = txts.some(rec => rec.join('').toLowerCase().startsWith('v=spf1'));
-    } catch (e) {}
+    } catch (e) { }
     try {
         const dmarcName = `_dmarc.${domain}`;
         const txts2 = await dns.resolveTxt(dmarcName);
         result.dmarc = txts2.some(rec => rec.join('').toLowerCase().startsWith('v=dmarc1'));
-    } catch (e) {}
+    } catch (e) { }
     return result;
 }
 
@@ -184,13 +185,13 @@ function analyzeHeaders(headersText) {
     if (!headersText) return { score: 10, report };
 
     const lowerHeaders = headersText.toLowerCase();
-    if (lowerHeaders.includes('spf=pass')) { score -= 15; report.spf = 'pass'; }
+    if (lowerHeaders.includes('spf=pass')) { score -= 4; report.spf = 'pass'; }
     else if (lowerHeaders.includes('spf=fail')) { score += 25; report.spf = 'fail'; }
-    if (lowerHeaders.includes('dkim=pass')) { score -= 10; report.dkim = 'pass'; }
+    if (lowerHeaders.includes('dkim=pass')) { score -= 3; report.dkim = 'pass'; }
     else if (lowerHeaders.includes('dkim=fail')) { score += 20; report.dkim = 'fail'; }
-    if (lowerHeaders.includes('dmarc=pass')) { score -= 5; report.dmarc = 'pass'; }
+    if (lowerHeaders.includes('dmarc=pass')) { score -= 2; report.dmarc = 'pass'; }
     else if (lowerHeaders.includes('dmarc=fail')) { score += 25; report.dmarc = 'fail'; }
-    
+
     const fromMatch = lowerHeaders.match(/from:.*<([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})>/);
     const returnPathMatch = lowerHeaders.match(/return-path:.*<([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})>/);
     if (fromMatch && returnPathMatch && fromMatch[1] !== returnPathMatch[1]) {
@@ -223,7 +224,7 @@ app.post('/scan-email', async (req, res) => {
 
         const headerAnalysis = analyzeHeaders(headers);
         const bodyAnalysis = analyzeBody(body);
-        
+
         const linkScanPromises = (links || []).map(link => aggregateSignals({ url: link.href, anchorText: link.anchorText }));
         const linkResults = await Promise.all(linkScanPromises);
 
@@ -235,14 +236,14 @@ app.post('/scan-email', async (req, res) => {
                 mostMaliciousLink = { url: result.url, score: result.score };
             }
         }
-        
+
         let finalScore = (headerAnalysis.score * 0.4) + (bodyAnalysis.score * 0.2) + (highestLinkScore * 0.4);
         const normalizedScore = Math.round(Math.min(100, finalScore));
 
         let verdict = 'safe';
         if (normalizedScore >= MALICIOUS_THRESHOLD) verdict = 'malicious';
         else if (normalizedScore >= SUSPICIOUS_THRESHOLD) verdict = 'suspicious';
-        
+
         const breakdown = {
             headerAnalysis: headerAnalysis.report,
             bodyAnalysis: { keywords: bodyAnalysis.keywordsFound },

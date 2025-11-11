@@ -1,16 +1,12 @@
 <!doctype html>
 <html>
-<head><meta charset="utf-8"><title>QuickPhish</title></head>
-<body>
+<head>
+  <meta charset="utf-8"><title>QuickPhish</title></head>
+<script src="popup.js"></script>
+  <body>
   <h3>QuickPhish</h3>
   <label>Backend URL: <input id="backend" style="width:100%"></label>
   <button id="save">Save</button>
-  <script>
-    const inp = document.getElementById('backend');
-    chrome.storage.local.get(['backendUrl'], (d) => { inp.value = d.backendUrl || 'http://localhost:8080/scan'; });
-    document.getElementById('save').addEventListener('click', () => {
-      chrome.storage.local.set({ backendUrl: inp.value }, () => alert('Saved'));
-    });
-  </script>
+  
 </body>
 </html>
